@@ -1,0 +1,39 @@
+# 部署到服务器（可手动触发，或在 Build 完成后自动触发）
+name: Deploy
+
+on:
+  workflow_dispatch: {}
+  workflow_run:
+    workflows: [Build]
+    types: [completed]
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  deploy:
+    name: Deploy to server
+    runs-on: ubuntu-latest
+    # 若由 workflow_run 触发，仅当 Build 成功时才执行
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
+
+    steps:
+      - name: Deploy to server (SSH + Docker)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
+            IMAGE="${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ github.event.repository.name }}:latest"
+            docker pull $IMAGE
+            docker stop demo-ci-cd 2>/dev/null || true
+            docker rm demo-ci-cd 2>/dev/null || true
+            docker run -d --name demo-ci-cd -p 80:80 --restart unless-stopped $IMAGE
+            docker image prune -f
+            echo "Deployed $IMAGE"
