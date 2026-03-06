@@ -1,6 +1,16 @@
 # demo-ci-cd
 
-静态页面 + GitHub Actions CI/CD：push 后自动**构建 Docker 镜像**并可选**部署到服务器**。
+基于 **MCP（Model Context Protocol）** 的 Agent 练习项目，支持通过自然语言查询天气，并通过 **GitHub Actions** 实现 CI/CD：push 后自动构建镜像并部署到服务器。
+
+## 项目说明
+
+- **已实现**
+  - **天气查询**：通过 MCP 工具调用 Open-Meteo 接口，可查询任意城市或经纬度的当前天气。
+  - **Web 对话**：FastAPI 提供网页与 Agent 对话，支持多轮对话与工具调用。
+  - **CI/CD**：Build workflow 构建镜像并推送到阿里云 ACR；Deploy workflow 通过 SSH 在服务器上拉取镜像并运行容器。
+- **尚未实现（开发中）**
+  - **文件管理**：将信息保存到本地文件（计划通过 MCP 写文件工具提供）。
+  - **地图导航**：查询地点、规划路线（计划中）。
 
 ## 流程概览
 
@@ -13,8 +23,8 @@
 # 构建
 docker build -t demo-ci-cd .
 
-# 运行（本地访问 http://localhost:8080）
-docker run -p 8080:80 demo-ci-cd
+# 运行（本地访问 http://localhost:8000）
+docker run -p 8000:8000 demo-ci-cd
 ```
 
 ## 本地用 Minikube 部署
@@ -106,9 +116,9 @@ Deploy 通过 **SSH** 连到你的服务器，在服务器上执行 `docker logi
 
 ## 文件说明
 
-- `index.html`：静态页面
-- `Dockerfile`：基于 nginx 提供静态资源
-- `k8s/deployment.yaml`、`k8s/service.yaml`：Kubernetes 清单（供 Minikube 等使用）
+- `project/`：MCP Agent 应用（FastAPI、天气 MCP、写文件 MCP 等）
+- `Dockerfile`：构建 `project/` 下的 Python 应用并用于部署
+- `k8s/`：Kubernetes 清单（供 Minikube 等使用）
 - `scripts/minikube-deploy.sh`：本地 Minikube 一键部署脚本
-- `.github/workflows/build.yml`：构建并推送镜像
+- `.github/workflows/build.yml`：构建并推送镜像到阿里云 ACR
 - `.github/workflows/deploy.yml`：部署到远程服务器（SSH + Docker）
