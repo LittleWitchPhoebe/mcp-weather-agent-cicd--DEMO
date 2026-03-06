@@ -6,8 +6,7 @@ import json
 import os
 from pathlib import Path
 from dotenv import load_dotenv
-from langchain_mcp_adapters.sessions import create_session
-from langchain_mcp_adapters.sessions.stdio import StdioConnection
+from langchain_mcp_adapters.sessions import create_session, StdioConnection
 from langchain_mcp_adapters.tools import load_mcp_tools
 from langchain_community.chat_models.tongyi import ChatTongyi
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
