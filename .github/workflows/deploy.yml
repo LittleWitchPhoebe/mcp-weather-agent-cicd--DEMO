@@ -42,12 +42,14 @@ jobs:
           ACR_IMAGE: ${{ env.ACR_IMAGE }}
           ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
           ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
+          DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
+          MODEL: ${{ secrets.MODEL }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           password: ${{ secrets.SSH_PASSWORD }}
-          envs: ACR_REGISTRY,ACR_IMAGE,ACR_USERNAME,ACR_PASSWORD
+          envs: ACR_REGISTRY,ACR_IMAGE,ACR_USERNAME,ACR_PASSWORD,DASHSCOPE_API_KEY,MODEL
           script: |
             set -e
             IMAGE="$ACR_REGISTRY/$ACR_IMAGE:latest"
@@ -57,6 +59,9 @@ jobs:
             docker pull "$IMAGE"
             docker stop demo-ci-cd 2>/dev/null || true
             docker rm demo-ci-cd 2>/dev/null || true
-            docker run -d --name demo-ci-cd -p 80:80 --restart unless-stopped "$IMAGE"
+            docker run -d --name demo-ci-cd -p 80:8000 --restart unless-stopped \
+              -e DASHSCOPE_API_KEY="$DASHSCOPE_API_KEY" \
+              -e MODEL="${MODEL:-qwen-plus}" \
+              "$IMAGE"
             docker image prune -f
             echo ">>> 部署完成，访问: http://${{ secrets.DEPLOY_HOST }}"

@@ -84,13 +84,15 @@ Deploy 通过 **SSH** 连到你的服务器，在服务器上执行 `docker logi
 
 仓库 **Settings → Secrets and variables → Actions** 中需有：
 
-| Secret 名称       | 说明 | 示例 |
-|------------------|------|------|
-| `DEPLOY_HOST`    | 服务器公网 IP 或域名 | `8.136.38.236` |
-| `DEPLOY_USER`    | SSH 登录用户名 | `root` |
-| `SSH_PASSWORD`   | 服务器 SSH 登录密码（与 root 密码一致即可） | （你的 root 密码） |
-| `ACR_USERNAME`   | 阿里云 ACR 用户名（Build 已用） | 同 Build |
-| `ACR_PASSWORD`   | 阿里云 ACR 密码（Build 已用） | 同 Build |
+| Secret 名称         | 说明 | 示例 |
+|---------------------|------|------|
+| `DEPLOY_HOST`       | 服务器公网 IP 或域名 | `8.136.38.236` |
+| `DEPLOY_USER`       | SSH 登录用户名 | `root` |
+| `SSH_PASSWORD`      | 服务器 SSH 登录密码（与 root 密码一致即可） | （你的 root 密码） |
+| `ACR_USERNAME`      | 阿里云 ACR 用户名（Build 已用） | 同 Build |
+| `ACR_PASSWORD`      | 阿里云 ACR 密码（Build 已用） | 同 Build |
+| `DASHSCOPE_API_KEY` | 通义千问 API Key（线上容器调用模型用） | 同 project/.env 中的值 |
+| `MODEL`             | 可选，模型名称，未填时默认 `qwen-plus` | `qwen-plus` |
 
 - 若用 **SSH 密钥** 而不是密码：可不填 `SSH_PASSWORD`，改填 `SSH_PRIVATE_KEY`（私钥全文）。  
 - **不要**把密码或私钥提交到代码里，只放在 GitHub Secrets 中。

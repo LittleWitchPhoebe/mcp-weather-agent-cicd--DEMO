@@ -1,13 +1,19 @@
-# 使用 nginx 提供静态文件
-FROM nginx:alpine
+# 构建 project/ 下的 Python 应用，用于 CI/CD 部署
+FROM python:3.11-slim
 
-# 删除默认页面，使用我们自己的
-RUN rm -rf /usr/share/nginx/html/*
+WORKDIR /app
 
-# 复制静态资源到 nginx 目录
-COPY . /usr/share/nginx/html/
+# 先只复制依赖，利用镜像缓存
+COPY project/requirements.txt .
 
-# 暴露 80 端口（nginx 默认）
-EXPOSE 87
+RUN pip install --no-cache-dir -r requirements.txt
 
-CMD ["nginx", "-g", "daemon off;"]
+# 再复制应用代码
+COPY project/ .
+
+# 无缓冲输出，便于看日志
+ENV PYTHONUNBUFFERED=1
+
+EXPOSE 8000
+
+CMD ["python", "-m", "uvicorn", "api_server:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,0 +1,19 @@
+# API 与 Web
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+
+# MCP 服务器与客户端
+mcp>=1.0.0
+fastmcp>=0.1.0
+
+# Agent 与模型
+langchain>=0.1.0
+langchain-core>=0.1.0
+langgraph>=0.0.20
+langchain-community>=0.0.20
+langchain-mcp-adapters>=0.1.0
+dashscope>=1.14.0
+
+# HTTP 与环境
+httpx>=0.26.0
+python-dotenv>=1.0.0

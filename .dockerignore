@@ -1,6 +1,14 @@
 .git
 .github
-README.md
 *.md
 .env
 .env.*
+**/.env
+**/.env.*
+Dockerfile
+.dockerignore
+k8s
+scripts
+docs
+# 根目录静态页若需单独构建可另建 Dockerfile
+index.html
