@@ -22,7 +22,18 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
 
     steps:
-      - name: Deploy to server (SSH + Docker)
+      - name: SSH 连接检查
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            echo ">>> 已连接服务器: $(hostname)"
+            docker --version
+            echo ">>> 连接正常，开始部署..."
+
+      - name: 拉取镜像并部署
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DEPLOY_HOST }}
@@ -31,9 +42,10 @@ jobs:
           script: |
             set -e
             IMAGE="${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ github.event.repository.name }}:latest"
+            echo ">>> 拉取镜像: $IMAGE"
             docker pull $IMAGE
             docker stop demo-ci-cd 2>/dev/null || true
             docker rm demo-ci-cd 2>/dev/null || true
             docker run -d --name demo-ci-cd -p 80:80 --restart unless-stopped $IMAGE
             docker image prune -f
-            echo "Deployed $IMAGE"
+            echo ">>> 部署完成，访问: http://${{ secrets.DEPLOY_HOST }}"

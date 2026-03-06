@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-ci-cd
+  labels:
+    app: demo-ci-cd
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: demo-ci-cd
+  template:
+    metadata:
+      labels:
+        app: demo-ci-cd
+    spec:
+      # 从 GHCR 拉镜像时取消注释，并先创建 imagePullSecret
+      # imagePullSecrets:
+      #   - name: ghcr-secret
+      containers:
+        - name: demo-ci-cd
+          image: demo-ci-cd:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "10m"
+            limits:
+              memory: "64Mi"
+              cpu: "100m"

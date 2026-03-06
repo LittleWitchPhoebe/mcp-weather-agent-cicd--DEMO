@@ -8,6 +8,6 @@ RUN rm -rf /usr/share/nginx/html/*
 COPY . /usr/share/nginx/html/
 
 # 暴露 80 端口（nginx 默认）
-EXPOSE 80
+EXPOSE 87
 
 CMD ["nginx", "-g", "daemon off;"]
