@@ -1,4 +1,5 @@
 # 部署到服务器（可手动触发，或在 Build 完成后自动触发）
+# 仅当配置了 DEPLOY_HOST、DEPLOY_USER、SSH_PRIVATE_KEY 时才会执行部署
 name: Deploy
 
 on:
@@ -12,14 +13,15 @@ permissions:
   contents: read
 
 env:
-  REGISTRY: ghcr.io
+  ACR_REGISTRY: crpi-tdt2zc9s3n24ef5b.cn-hangzhou.personal.cr.aliyuncs.com
+  ACR_IMAGE: test017/test-cicid
 
 jobs:
   deploy:
     name: Deploy to server
     runs-on: ubuntu-latest
-    # 若由 workflow_run 触发，仅当 Build 成功时才执行
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
+    # 未配置部署主机时跳过，避免 "missing server host" 报错
+    if: ${{ secrets.DEPLOY_HOST != '' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')) }}
 
     steps:
       - name: SSH 连接检查
@@ -35,17 +37,25 @@ jobs:
 
       - name: 拉取镜像并部署
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          ACR_REGISTRY: ${{ env.ACR_REGISTRY }}
+          ACR_IMAGE: ${{ env.ACR_IMAGE }}
+          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
+          ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: ACR_REGISTRY,ACR_IMAGE,ACR_USERNAME,ACR_PASSWORD
           script: |
             set -e
-            IMAGE="${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ github.event.repository.name }}:latest"
+            IMAGE="$ACR_REGISTRY/$ACR_IMAGE:latest"
+            echo ">>> 登录阿里云 ACR..."
+            echo "$ACR_PASSWORD" | docker login "$ACR_REGISTRY" -u "$ACR_USERNAME" --password-stdin
             echo ">>> 拉取镜像: $IMAGE"
-            docker pull $IMAGE
+            docker pull "$IMAGE"
             docker stop demo-ci-cd 2>/dev/null || true
             docker rm demo-ci-cd 2>/dev/null || true
-            docker run -d --name demo-ci-cd -p 80:80 --restart unless-stopped $IMAGE
+            docker run -d --name demo-ci-cd -p 80:80 --restart unless-stopped "$IMAGE"
             docker image prune -f
             echo ">>> 部署完成，访问: http://${{ secrets.DEPLOY_HOST }}"
