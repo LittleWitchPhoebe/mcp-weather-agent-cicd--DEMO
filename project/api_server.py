@@ -195,6 +195,7 @@ class ChatResponse(BaseModel):
 async def chat(req: ChatRequest):
     if agent is None:
         raise HTTPException(status_code=503, detail="Agent 未就绪（无可用 MCP 工具）")
+    print(f"[chat] thread_id={req.thread_id!r}", file=sys.stderr, flush=True)  # 调试：同一对话应始终相同
     try:
         result = await agent.ainvoke(
             {"messages": [{"role": "user", "content": req.message}]},
