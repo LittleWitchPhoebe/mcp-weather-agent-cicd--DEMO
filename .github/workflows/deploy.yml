@@ -1,5 +1,4 @@
 # 部署到服务器（可手动触发，或在 Build 成功完成后自动触发）
-# Build 是 Deploy 的先决条件：仅当由 workflow_run 触发时，须 Build 成功才执行 Deploy
 name: Deploy
 
 on:
@@ -17,25 +16,11 @@ env:
   ACR_IMAGE: test017/test-cicid
 
 jobs:
-  # 检查是否已配置部署主机（job 级 if 不能使用 secrets，用前置 job 输出）
-  check:
-    name: Check deploy config
-    runs-on: ubuntu-latest
-    outputs:
-      run_deploy: ${{ steps.set.outputs.run_deploy }}
-    steps:
-      - id: set
-        run: |
-          if [ -n "$DEPLOY_HOST" ]; then echo "run_deploy=true" >> $GITHUB_OUTPUT; else echo "run_deploy=false" >> $GITHUB_OUTPUT; fi
-        env:
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-
   deploy:
     name: Deploy to server
     runs-on: ubuntu-latest
-    needs: check
-    # 仅当已配置部署主机 且（手动触发 或 Build 成功）时执行
-    if: ${{ needs.check.outputs.run_deploy == 'true' && (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success') }}
+    # 手动触发直接跑；由 Build 触发时仅当 Build 成功才跑
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
 
     steps:
       - name: SSH 连接检查
@@ -44,6 +29,7 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          password: ${{ secrets.SSH_PASSWORD }}
           script: |
             echo ">>> 已连接服务器: $(hostname)"
             docker --version
@@ -60,6 +46,7 @@ jobs:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          password: ${{ secrets.SSH_PASSWORD }}
           envs: ACR_REGISTRY,ACR_IMAGE,ACR_USERNAME,ACR_PASSWORD
           script: |
             set -e

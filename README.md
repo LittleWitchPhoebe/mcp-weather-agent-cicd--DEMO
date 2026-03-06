@@ -67,78 +67,40 @@ kubectl create secret docker-registry ghcr-secret \
 
 ## Deploy workflow（与服务器联通）
 
-Deploy 通过 **SSH** 连到你的服务器，在服务器上执行 `docker pull` + `docker run`，无需在 GitHub 里存服务器密码，只需配好 SSH 密钥和主机信息即可“自己和服务器联通”。
+Deploy 通过 **SSH** 连到你的服务器，在服务器上执行 `docker login`（阿里云 ACR）→ `docker pull` → `docker run`。拉镜像用的 ACR 账号由 workflow 传入，**服务器上无需预先 docker login**。
 
-### 阿里云服务器配置步骤
+### 一、服务器上需要做的（阿里云 ECS）
 
-#### 1. 安全组放行端口
+1. **安全组放行**：22（SSH）、80（HTTP）。
+2. **安装 Docker**（SSH 登录后执行）：
+   ```bash
+   curl -fsSL https://get.docker.com | sh
+   systemctl enable docker && systemctl start docker
+   ```
+3. **允许 root 用密码 SSH 登录**（若当前已是密码登录，可跳过）：  
+   确认 `/etc/ssh/sshd_config` 中 `PasswordAuthentication yes`，然后 `systemctl restart sshd`。
 
-在 阿里云控制台 → ECS → 安全组 → 配置规则 中放行：
+### 二、GitHub 仓库里配置的 Secrets
 
-- **22**（SSH）：供 GitHub Actions 登录。
-- **80**（HTTP）：供浏览器访问页面。
+仓库 **Settings → Secrets and variables → Actions** 中需有：
 
-#### 2. 在服务器上安装 Docker
+| Secret 名称       | 说明 | 示例 |
+|------------------|------|------|
+| `DEPLOY_HOST`    | 服务器公网 IP 或域名 | `8.136.38.236` |
+| `DEPLOY_USER`    | SSH 登录用户名 | `root` |
+| `SSH_PASSWORD`   | 服务器 SSH 登录密码（与 root 密码一致即可） | （你的 root 密码） |
+| `ACR_USERNAME`   | 阿里云 ACR 用户名（Build 已用） | 同 Build |
+| `ACR_PASSWORD`   | 阿里云 ACR 密码（Build 已用） | 同 Build |
 
-SSH 登录到阿里云（用控制台 VNC 或本地 `ssh root@你的公网IP`），执行：
+- 若用 **SSH 密钥** 而不是密码：可不填 `SSH_PASSWORD`，改填 `SSH_PRIVATE_KEY`（私钥全文）。  
+- **不要**把密码或私钥提交到代码里，只放在 GitHub Secrets 中。
 
-```bash
-# 以 root 或 sudo 执行
-curl -fsSL https://get.docker.com | sh
-systemctl enable docker && systemctl start docker
-```
+### 三、触发部署
 
-#### 3. 服务器上登录 GHCR（拉取镜像用）
-
-若仓库或镜像是私有的，在服务器上执行一次（PAT 需勾选 `read:packages`）：
-
-```bash
-echo "你的GitHub_PAT" | docker login ghcr.io -u 你的GitHub用户名 --password-stdin
-```
-
-公开镜像可跳过本步。
-
-#### 4. 生成 SSH 密钥并配置到服务器
-
-在**你本机**执行（不要设密码，直接回车两次，便于 CI 使用）：
-
-```bash
-ssh-keygen -t ed25519 -C "github-actions-deploy" -f ~/.ssh/deploy_demo_ci_cd -N ""
-```
-
-- 把**公钥**写入服务器（将下面 `你的公网IP` 换成实际 IP）：
-
-```bash
-ssh-copy-id -i ~/.ssh/deploy_demo_ci_cd.pub root@你的公网IP
-```
-
-- 若没有 `ssh-copy-id`，可手动在服务器上执行：
-
-```bash
-# 在服务器上
-mkdir -p ~/.ssh
-echo "这里粘贴 deploy_demo_ci_cd.pub 的内容" >> ~/.ssh/authorized_keys
-chmod 600 ~/.ssh/authorized_keys
-```
-
-#### 5. 在 GitHub 仓库配置 Secrets
-
-仓库 **Settings → Secrets and variables → Actions → New repository secret**，添加：
-
-| Secret 名称        | 值 |
-|--------------------|----|
-| `DEPLOY_HOST`      | 阿里云 ECS 的**公网 IP**（或已解析到该机的域名） |
-| `DEPLOY_USER`      | SSH 登录用户名（阿里云一般为 `root`） |
-| `SSH_PRIVATE_KEY`  | 本机 `~/.ssh/deploy_demo_ci_cd` 文件的**全部内容**（含 `-----BEGIN ... KEY-----` 和 `-----END ... KEY-----`） |
-
-保存后，Deploy workflow 会用这些信息**自己**和服务器联通并部署。
-
-#### 6. 触发部署
-
-- **手动**：Actions → 选择 “Deploy” → “Run workflow”。
+- **手动**：Actions → 选 “Deploy” → “Run workflow”。
 - **自动**：Build 成功后会触发 Deploy。
 
-部署成功后访问：**`http://你的公网IP`**（80 端口）。
+部署成功后访问：**`http://8.136.38.236`**（或你的公网 IP，80 端口）。
 
 ## 文件说明
 
