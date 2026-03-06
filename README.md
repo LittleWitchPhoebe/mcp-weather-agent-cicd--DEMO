@@ -2,6 +2,9 @@
 
 基于 **MCP（Model Context Protocol）** 的 Agent 练习项目，支持通过自然语言查询天气，并通过 **GitHub Actions** 实现 CI/CD：push 后自动构建镜像并部署到服务器。
 
+<img width="585" height="750" alt="image" src="https://github.com/user-attachments/assets/ca4119db-bc48-4ede-84f9-e1aa5054e15e" />
+
+
 ## 项目说明
 
 - **已实现**
