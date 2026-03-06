@@ -4,14 +4,17 @@ FastAPI HTTP API：对外提供与 Agent 对话的接口。
 import asyncio
 import json
 import os
+import sys
 from pathlib import Path
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
-from langchain_mcp_adapters.sessions import create_session, StdioConnection
+from langchain_core.tools.base import ToolException
 from langchain_mcp_adapters.tools import load_mcp_tools
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
 from langchain_community.chat_models.tongyi import ChatTongyi
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langgraph.prebuilt import create_react_agent
@@ -25,54 +28,68 @@ with open(PROJECT_ROOT / "servers_config.json", "r", encoding="utf-8") as f:
 with open(PROJECT_ROOT / "agent_prompts.txt", "r", encoding="utf-8") as f:
     prompt_text = f.read().strip()
 
-# 全局 Agent 与 sessions（启动时初始化）
+# 全局 Agent 与 MCP 上下文管理器（stdio_cm, session_cm）关闭时需按顺序 exit
 agent = None
-mcp_sessions = []
+mcp_context_managers = []  # list of (stdio_cm, session_cm)
 
 
 async def init_agent():
-    global agent, mcp_sessions
+    global agent, mcp_context_managers
     all_tools = []
     for s in servers_cfg:
         name = s.get("name", "mcp")
-        cmd = s.get("command", ["python", "-m", name])
+        cmd = s.get("command", ["python3", "weather_server.py"])
         cwd = s.get("cwd", str(PROJECT_ROOT))
         workdir = Path(cwd).resolve() if cwd and cwd != "." else PROJECT_ROOT
-        connection = StdioConnection(
-            transport="stdio",
-            command=cmd[0],
-            args=cmd[1:] if len(cmd) > 1 else [],
-            cwd=workdir,
-        )
+        executable = sys.executable
+        args = [a for a in cmd[1:] if a] if len(cmd) > 1 else [f"{name}_server.py"]
         try:
-            session = await create_session(connection)
-            mcp_sessions.append(session)
+            # 用官方 mcp 包的 stdio_client + ClientSession，并显式 initialize()，避免 FastMCP 报 "Received request before initialization"
+            # 子进程继承当前目录，请从 project/ 目录启动 api_server
+            server_params = StdioServerParameters(command=executable, args=args)
+            stdio_cm = stdio_client(server_params)
+            read, write = await stdio_cm.__aenter__()
+            session_cm = ClientSession(read, write)
+            session = await session_cm.__aenter__()
+            await session.initialize()
+            mcp_context_managers.append((stdio_cm, session_cm))
             tools = await load_mcp_tools(session, server_name=name, tool_name_prefix=True)
             all_tools.extend(tools)
-        except Exception:
-            pass
-    if not all_tools:
-        return
-    model = ChatTongyi(model=os.getenv("MODEL", "qwen-plus"))
-    prompt_template = ChatPromptTemplate.from_messages([
-        ("system", prompt_text),
-        MessagesPlaceholder(variable_name="messages"),
-    ])
-    agent = create_react_agent(
-        model=model,
-        tools=all_tools,
-        prompt=prompt_template,
-        checkpointer=MemorySaver(),
-    )
+        except Exception as e:
+            print(f"[MCP] {name} 未就绪: {e}", file=sys.stderr, flush=True)
+    if all_tools:
+        print(f"[MCP] 已加载 {len(all_tools)} 个工具", file=sys.stderr, flush=True)
+    else:
+        print("[MCP] 未加载到任何工具，仅使用模型对话（无天气/写文件能力）", file=sys.stderr, flush=True)
+    # 无论是否加载到 MCP 工具，都创建 Agent：无工具时仅用模型对话
+    try:
+        model = ChatTongyi(model=os.getenv("MODEL", "qwen-plus"))
+        prompt_template = ChatPromptTemplate.from_messages([
+            ("system", prompt_text if all_tools else "你是助手，请简洁友好地回复用户。"),
+            MessagesPlaceholder(variable_name="messages"),
+        ])
+        agent = create_react_agent(
+            model=model,
+            tools=all_tools,
+            prompt=prompt_template,
+            checkpointer=MemorySaver(),
+        )
+    except Exception:
+        agent = None
 
 
 async def close_sessions():
-    for s in mcp_sessions:
+    # 先关 session 再关 stdio
+    for stdio_cm, session_cm in reversed(mcp_context_managers):
         try:
-            await s.__aexit__(None, None, None)
+            await session_cm.__aexit__(None, None, None)
         except Exception:
             pass
-    mcp_sessions.clear()
+        try:
+            await stdio_cm.__aexit__(None, None, None)
+        except Exception:
+            pass
+    mcp_context_managers.clear()
 
 
 @asynccontextmanager
@@ -178,12 +195,19 @@ class ChatResponse(BaseModel):
 async def chat(req: ChatRequest):
     if agent is None:
         raise HTTPException(status_code=503, detail="Agent 未就绪（无可用 MCP 工具）")
-    result = await agent.ainvoke(
-        {"messages": [{"role": "user", "content": req.message}]},
-        config={"configurable": {"thread_id": req.thread_id}},
-    )
-    reply = result["messages"][-1].content
-    return ChatResponse(reply=reply)
+    try:
+        result = await agent.ainvoke(
+            {"messages": [{"role": "user", "content": req.message}]},
+            config={"configurable": {"thread_id": req.thread_id}},
+        )
+        reply = result["messages"][-1].content
+        return ChatResponse(reply=reply)
+    except ToolException as e:
+        if "timed out" in str(e).lower():
+            return ChatResponse(reply="上游请求超时，请稍后重试一次。")
+        return ChatResponse(reply=f"工具调用异常：{e!s}")
+    except Exception as e:
+        return ChatResponse(reply=f"请求出错，请重试。错误：{e!s}")
 
 
 @app.get("/health")
