@@ -1,4 +1,4 @@
-# demo-ci-cd
+# 基于CI/CD的Agent 天气查询练习项目
 
 基于 **MCP（Model Context Protocol）** 的 Agent 练习项目，支持通过自然语言查询天气，并通过 **GitHub Actions** 实现 CI/CD：push 后自动构建镜像并部署到服务器。
 
