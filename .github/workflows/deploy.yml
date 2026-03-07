@@ -23,12 +23,11 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
 
     steps:
-      - name: SSH 连接检查
+      - name: SSH connection check
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
           password: ${{ secrets.SSH_PASSWORD }}
           script: |
             echo ">>> 已连接服务器: $(hostname)"
@@ -47,7 +46,6 @@ jobs:
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
           password: ${{ secrets.SSH_PASSWORD }}
           envs: ACR_REGISTRY,ACR_IMAGE,ACR_USERNAME,ACR_PASSWORD,DASHSCOPE_API_KEY,MODEL
           script: |
