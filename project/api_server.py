@@ -129,7 +129,7 @@ async def root():
     </style>
     </head>
     <body>
-    <p class="welcome">欢迎使用 MCP-Agent，有什么可以帮您？</p>
+    <p class="welcome">欢迎使用 MCP-Agent，有什么可以帮您呢呢？</p>
     <div id="history"></div>
     <div class="input-row">
       <input id="input" type="text" placeholder="输入消息..." enterkeyhint="send" />
